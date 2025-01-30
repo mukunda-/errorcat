@@ -112,15 +112,16 @@ func Guard(rerr *error, annotate ...any) {
 	// Annotate the error.
 	if captured != nil {
 		for _, annotator := range annotate {
-			if f, ok := annotator.(Annotator); ok {
-				captured = f(captured)
-			} else if ea, ok := annotator.(error); ok {
-				captured = fmt.Errorf("%w: %w", ea, captured)
-			} else if str, ok := annotator.(string); ok {
-				captured = fmt.Errorf("%s: %w", str, captured)
-			} else {
+			switch a := annotator.(type) {
+			case Annotator:
+				captured = a(captured)
+			case error:
+				captured = fmt.Errorf("%w: %w", a, captured)
+			case string:
+				captured = fmt.Errorf("%s: %w", a, captured)
+			default:
 				// Unknown!
-				captured = fmt.Errorf("%v: %w", annotator, captured)
+				captured = fmt.Errorf("%v: %w", a, captured)
 			}
 
 			if captured == nil {

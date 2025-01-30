@@ -12,6 +12,7 @@ import (
 
 var ErrWriteImaginaryFileFailed = errors.New("write to imaginary file failed")
 var errTest = errors.New("test-error")
+var errTest2 = errors.New("test-error2")
 
 // All errors from Catch are warpped in CatError which
 // can be unwrapped to the original error.
@@ -106,6 +107,17 @@ func TestGuardAnnotation(t *testing.T) {
 	}()
 
 	assert.NoError(t, err)
+
+	func() {
+		// If an error is given, that is added to the chain.
+		defer cat.Guard(&err, errTest2)
+
+		cat.Catch(true, errTest)
+	}()
+
+	assert.Equal(t, "test-error2: test-error", err.Error())
+	assert.ErrorIs(t, err, errTest2)
+	assert.ErrorIs(t, err, errTest)
 }
 
 func assertErrorIsCat(t *testing.T, err error) {
