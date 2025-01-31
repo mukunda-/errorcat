@@ -12,37 +12,37 @@ Take this code for example:
 
 ```
 import (
-   "io"
-   "os"
+	"io"
+	"os"
 )
 
 func writeLine(w io.Writer, text string) error {
-   _, err := w.Write([]byte(text + "\n"))
-   if err != nil {
-      return err
-   }
-   return nil
+	_, err := w.Write([]byte(text + "\n"))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func MyFunction() error {
-   f, err := os.Open("file.txt")
-   if err != nil {
-      return err
-   }
+	f, err := os.Open("file.txt")
+	if err != nil {
+		return err
+	}
 
-   if err := writeLine(f, "Hallo welt!"); err != nil {
-      return err
-   }
+	if err := writeLine(f, "Hallo welt!"); err != nil {
+		return err
+	}
 
-   if err := writeLine(f, "Goodbye!"); err != nil {
-      return err
-   }
+	if err := writeLine(f, "Goodbye!"); err != nil {
+		return err
+	}
 
-   if err := writeLine(f, "Level 3"); err != nil {
-      return err
-   }
+	if err := writeLine(f, "Level 3"); err != nil {
+		return err
+	}
 
-   return nil
+	return nil
 }
 ```
 
@@ -50,31 +50,31 @@ I/O has a lot of error conditions that you can't do much about. Here is using Er
 
 ```
 import (
-   "fmt"
-   "io"
-   "os"
+	"fmt"
+	"io"
+	"os"
 
-   cat "go.mukunda.com/errorcat"
+	cat "go.mukunda.com/errorcat"
 )
 
 func writeLine(w io.Writer, text string) {
-   _, err := w.Write([]byte(text + "\n"))
-   cat.Catch(err, "failed writing to file")
+	_, err := w.Write([]byte(text + "\n"))
+	cat.Catch(err, "failed writing to file")
 }
 
 func MyFunction() (rerr error) {
-   defer cat.Guard(&rerr, "myfunction failed")
+	defer cat.Guard(&rerr, "myfunction failed")
 
-   f, err := os.Open("file.txt")
+	f, err := os.Open("file.txt")
 
-   // Telling the user what file operation failed
-   cat.Catch(err, "failed opening config file") 
+	// Telling the user what file operation failed
+	cat.Catch(err, "failed opening config file") 
 
-   writeLine(f, "Hallo welt!")
-   writeLine(f, "Goodbye!")
-   writeLine(f, "Level 3")
+	writeLine(f, "Hallo welt!")
+	writeLine(f, "Goodbye!")
+	writeLine(f, "Level 3")
 
-   return nil
+	return nil
 }
 ```
 
@@ -125,17 +125,17 @@ First you set up a recovery point, like so:
 	func OnRequest() (rerr error) {
 		defer cat.Recover(nil, &rerr, "request failed")
 
-      handleRequest()
+		handleRequest()
 
 		return nil
 	}
 
 When handling errors in your subfunctions, you use cat.Catch:
 
-   func handleRequest() {
+	func handleRequest() {
 		err := someLibraryFunction()
 		cat.Catch(err, "someLibraryFunction didn't work")
-   }
+	}
 
 If it catches an error, it will bubble to the recovery point and annotate it with the 
 messages provided, e.g., `request failed: someLibraryFunction didn't work: (error text)`.
@@ -144,18 +144,18 @@ Simple, right? A bulk of error handling is just that, annotating the error for t
 What's more useful for HTTP servers is decorating an error with an HTTP response code. For
 example:
 
-   func handlePostUser(user string) {
-      cat.Catch(user == "", BadRequest("user cannot be empty"))
-   }
+	func handlePostUser(user string) {
+		cat.Catch(user == "", BadRequest("user cannot be empty"))
+	}
 
 `BadRequest` isn't a provided function, but it's easy enough to implement yourself. In the
 recover area, you would check the error for a BadRequest and then map it accordingly. You
 can also create a higher level package that provides more flavor for your errors directly.
 For example:
 
-   func handlePostUser(user string) {
-      mycat.BadIf(user == "", "user cannot be empty")
-   }
+	func handlePostUser(user string) {
+		mycat.BadIf(user == "", "user cannot be empty")
+	}
 
 ### Errorcat With Context
 
@@ -168,13 +168,13 @@ With an Errorcat context, you use the context object to throw errors rather than
 global functions. That way, you *know* that you are within a guarded context when calling
 Catch (otherwise, there is no object with which to call Catch!).
 
-   func MyLibraryFunction() (rerr error) {
-      ct := errorcat.NewContext()
-      defer errorcat.Recover(ct, &rerr, "mylibraryfunction failed")
+	func MyLibraryFunction() (rerr error) {
+		ct := errorcat.NewContext()
+		defer errorcat.Recover(ct, &rerr, "mylibraryfunction failed")
 
-      someSubfunction(ct)
-      return nil
-   }
+		someSubfunction(ct)
+		return nil
+	}
 
 When calling subfunctions, you will know that you need to guard the upper function if it
 requires a context to be passed in. Without context, it's not easy to tell which of your

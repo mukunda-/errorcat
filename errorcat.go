@@ -26,7 +26,7 @@ then you can freely call cat.Catch to throw errors.
 	}
 
 For more strictness, you have the option to use contexts. This makes it easier to track
-guard safety when you're working with multiple guard entry points (e.g., library code).
+guard safety when you're working with multiple guard locations (e.g., library code).
 
 	import "go.mukunda.com/errorcat"
 	// No convenience alias, since we're using the context variable instead.
@@ -42,6 +42,8 @@ guard safety when you're working with multiple guard entry points (e.g., library
 
 		})
 	}
+
+See the repo README.md for more information on usage.
 */
 package errorcat
 
