@@ -10,7 +10,7 @@ import (
 // For this example code, any error returned from this function is annotated with a
 // specific type. The annotation is not mandatory, but it can help with verbosity.
 func writeToImaginaryFile(success bool) (rerr error) {
-	defer cat.Guard(&rerr, ErrWriteImaginaryFileFailed)
+	defer cat.Recover(&rerr, ErrWriteImaginaryFileFailed)
 
 	var err error
 	if success {

@@ -14,14 +14,14 @@ func writeLine(w io.Writer, text string) {
 }
 
 func MyFunction() (rerr error) {
-	defer cat.Guard(&rerr, "myfunction failed")
+	defer cat.Recover(&rerr, "myfunction failed")
 
 	f, err := os.Open("file.txt")
 	cat.Catch(err, "failed opening config file") // Annotated error reason.
 
-	writeLine(f, "hello world")
-	writeLine(f, "goodbye world")
-	writeLine(f, "line number three")
+	writeLine(f, "Hallo welt!")
+	writeLine(f, "Goodbye!")
+	writeLine(f, "Level 3")
 
 	return nil
 }

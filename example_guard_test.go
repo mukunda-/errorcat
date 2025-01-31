@@ -1,35 +1,24 @@
 package errorcat_test
 
 import (
-	"errors"
 	"fmt"
+	"os"
 
-	cat "go.mukunda.com/errorcat"
+	"go.mukunda.com/errorcat"
 )
 
-func guardedFunction() (rerr error) {
-	defer cat.Guard(&rerr, "guarded function failed")
-
-	// When Catch is called with a boolean, it will break execution with the given reason
-	// when the condition is true.
-	shouldWeFail := true
-	cat.Catch(shouldWeFail, "bad condition")
-
-	// Catch can also be called with an error. The reason part is optional but helps to
-	// describe where the error is from. Note that this is also combined with the
-	// function-level annotation from cat.Guard.
-	myerr := errors.New("an error state")
-	cat.Catch(myerr, "found myerr")
-
-	// If all goes well, Catch will let execution pass through.
-
-	return nil
-}
-
-// Example of catching an annotated error from within a function.
+// Example of creating a guard that catches all errors within.
 func ExampleGuard() {
-	err := guardedFunction()
+
+	err := errorcat.Guard(func(cat errorcat.Context) error {
+		f, err := os.Open("nonexistant-config-file.txt")
+		cat.Catch(err, "couldn't open configuration file")
+		defer f.Close()
+		fmt.Println("opened file!")
+		return nil
+	})
+
 	fmt.Println(err)
 	// Output:
-	// guarded function failed: bad condition
+	// couldn't open configuration file: open nonexistant-config-file.txt: The system cannot find the file specified.
 }

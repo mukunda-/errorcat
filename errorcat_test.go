@@ -32,7 +32,7 @@ func TestUnwrappingCatError(t *testing.T) {
 // a general error.
 func TestCatchingRealPanic(t *testing.T) {
 
-	defer cat.Guard(nil, func(err error) error {
+	defer cat.Recover(nil, func(err error) error {
 		// The error should contain the original text.
 		assert.Equal(t, "test error", err.Error())
 		return err
@@ -49,7 +49,7 @@ func TestGuardAnnotation(t *testing.T) {
 	func() {
 		// String annotators wrap errors with a simple string.
 
-		defer cat.Guard(&err, "string annotation")
+		defer cat.Recover(&err, "string annotation")
 		cat.Catch(true, "bad condition 1")
 	}()
 
@@ -58,7 +58,7 @@ func TestGuardAnnotation(t *testing.T) {
 	erasedError := errors.New("the error was erased")
 	func() {
 		// Function annotators can transform the error.
-		defer cat.Guard(&err, func(err error) error {
+		defer cat.Recover(&err, func(err error) error {
 			return erasedError
 		})
 		cat.Catch(true, "bad condition 2")
@@ -69,7 +69,7 @@ func TestGuardAnnotation(t *testing.T) {
 	func() {
 		// Other types should not be used, but to be safe they are formatted in a generic
 		// manner, same as strings.
-		defer cat.Guard(&err, 123)
+		defer cat.Recover(&err, 123)
 
 		cat.Catch(true, "bad condition 3")
 	}()
@@ -78,7 +78,7 @@ func TestGuardAnnotation(t *testing.T) {
 
 	func() {
 		// Multiple annotators can be used.
-		defer cat.Guard(&err, "first", "second", func(err error) error {
+		defer cat.Recover(&err, "first", "second", func(err error) error {
 			return fmt.Errorf("and third: %w", err)
 		})
 
@@ -89,7 +89,7 @@ func TestGuardAnnotation(t *testing.T) {
 
 	func() {
 		// If an annotator function returns nil, the chain is not continued.
-		defer cat.Guard(&err,
+		defer cat.Recover(&err,
 			"first",
 			"second",
 			func(err error) error {
@@ -110,7 +110,7 @@ func TestGuardAnnotation(t *testing.T) {
 
 	func() {
 		// If an error is given, that is added to the chain.
-		defer cat.Guard(&err, errTest2)
+		defer cat.Recover(&err, errTest2)
 
 		cat.Catch(true, errTest)
 	}()
@@ -134,7 +134,7 @@ func TestProblems(t *testing.T) {
 
 	// When using an error + error combination in cat, both errors are wrapped.
 	func() {
-		defer cat.Guard(&err)
+		defer cat.Recover(&err)
 		cat.Catch(errTest, fmt.Errorf("%w: try again later", serviceError))
 	}()
 
@@ -145,7 +145,7 @@ func TestProblems(t *testing.T) {
 	// When using an error + nil combination, the error is wrapped and bubbled without
 	// further annotation.
 	func() {
-		defer cat.Guard(&err)
+		defer cat.Recover(&err)
 		cat.Catch(errTest)
 	}()
 
@@ -156,7 +156,7 @@ func TestProblems(t *testing.T) {
 	// When using an error + string combination, the error is wrapped and annotated with
 	// the string.
 	func() {
-		defer cat.Guard(&err)
+		defer cat.Recover(&err)
 		cat.Catch(errTest, "problem")
 	}()
 
@@ -167,7 +167,7 @@ func TestProblems(t *testing.T) {
 	// When using a non-string type, it's treated the same (via fmt magic), but you
 	// shouldn't be doing that.
 	func() {
-		defer cat.Guard(&err)
+		defer cat.Recover(&err)
 		cat.Catch(errTest, 123)
 	}()
 
@@ -178,7 +178,7 @@ func TestProblems(t *testing.T) {
 	// When using a boolean + error combination, the problem is wrapped as the primary
 	// error.
 	func() {
-		defer cat.Guard(&err)
+		defer cat.Recover(&err)
 		assert.NotPanics(t, func() {
 			cat.Catch(false, fmt.Errorf("should not be thrown"))
 		})
@@ -192,7 +192,7 @@ func TestProblems(t *testing.T) {
 	// When using a boolean + nil combination, the problem is wrapped as an unknown error.
 	// This case should not be used in practice.
 	func() {
-		defer cat.Guard(&err)
+		defer cat.Recover(&err)
 		assert.NotPanics(t, func() {
 			cat.Catch(false)
 		})
@@ -205,7 +205,7 @@ func TestProblems(t *testing.T) {
 	// When using a boolean + string combination, the problem is wrapped as a general
 	// untyped error.
 	func() {
-		defer cat.Guard(&err)
+		defer cat.Recover(&err)
 		cat.Catch(false, "notproblemstring")
 		cat.Catch(true, "problemstring")
 	}()
@@ -216,7 +216,7 @@ func TestProblems(t *testing.T) {
 	// When using a boolean + non-string type, the problem is wrapped as a general untyped
 	// error, but this case should not be used in practice.
 	func() {
-		defer cat.Guard(&err)
+		defer cat.Recover(&err)
 		cat.Catch(false, 123)
 		cat.Catch(true, 456)
 	}()
@@ -230,10 +230,20 @@ func TestProblems(t *testing.T) {
 func TestInvalidCatch(t *testing.T) {
 	var err error
 	func() {
-		defer cat.Guard(&err)
+		defer cat.Recover(&err)
 		cat.Catch(123)
 	}()
 
 	assert.ErrorIs(t, err, cat.ErrBadCatch)
 	assertErrorIsCat(t, err)
+}
+
+func TestGo(t *testing.T) {
+	err := <-cat.Go(func(ct cat.Context) error {
+		cat.Catch(true, "whoops")
+		return nil
+	}, "test")
+
+	assert.Error(t, err)
+	assert.Equal(t, "test: whoops", err.Error())
 }
