@@ -202,7 +202,8 @@ can't do that.
 
 I recommend having a linter rule to make sure that you never forget a deferred recover. It
 is easy enough to forget to call `Recover`, just as it is easy to forget the `defer`
-keyword, both of which will silently cause hidden fatal panics later on.
+keyword, both of which will silently cause hidden fatal panics later on. Using `Guard` may
+be preferrable to using `Recover` directly, as it will automatically defer the recovery.
 
 ## Additional Details
 
