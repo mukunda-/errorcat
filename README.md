@@ -17,7 +17,7 @@ import (
 )
 
 func writeLine(w io.Writer, text string) error {
-   _, err := w.Write([]byte(text))
+   _, err := w.Write([]byte(text + "\n"))
    if err != nil {
       return err
    }
@@ -58,7 +58,7 @@ import (
 )
 
 func writeLine(w io.Writer, text string) {
-   _, err := w.Write([]byte(text))
+   _, err := w.Write([]byte(text + "\n"))
    cat.Catch(err, "failed writing to file")
 }
 
@@ -84,7 +84,7 @@ errors.
 Errorcat is meant to handle errors that you don't expect to recover from. It's not meant
 for common errors that often affect execution paths. Those should still be handled the
 *normal* way, i.e., returned and checked. When writing code with Errorcat, you can filter
-out rare errors, catching those with Errorcat, and then only return and check errors that
+out rare errors, "catching" them with Errorcat, and then only return and check errors that
 are of interest to your application.
 
 While you can have nested recovery points with Errorcat, it's more meant to have only one

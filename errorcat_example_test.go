@@ -9,7 +9,7 @@ import (
 )
 
 func writeLine(w io.Writer, text string) {
-	_, err := w.Write([]byte(text))
+	_, err := w.Write([]byte(text + "\n"))
 	cat.Catch(err, "failed writing to file")
 }
 
