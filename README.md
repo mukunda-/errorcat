@@ -5,7 +5,7 @@
 *Use This One Weird Trick To Clean Up Your Go Code!*
 
 This package introduces error handling concepts using panic and recover. The
-*panic-pattern* I call it. An *anti-pattern* others call it, but panics are a super
+*error-panic pattern* I call it. An *anti-pattern* others call it, but panics are a super
 convenient way to handle *exceptional* conditions in your code.
 
 Take this code for example:
@@ -161,8 +161,8 @@ For example:
 
 Okay, now pretend you're writing a library, where you really don't want panics to leak
 past your package code. How do you ensure that 100%? When writing library code, you don't
-have the convenience of a central recovery area. Each function that uses the panic pattern
-must recover on its own and have an error return.
+have the convenience of a central recovery area. Each function that uses the error-panic
+pattern must recover on its own and have an error return.
 
 With an Errorcat context, you use the context object to throw errors rather than the
 global functions. That way, you *know* that you are within a guarded context when calling
