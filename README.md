@@ -4,9 +4,10 @@
 
 *Use This One Weird Trick To Clean Up Your Go Code!*
 
-This package introduces error handling concepts using panic and recover. The
-*error-panic pattern* I call it. An *anti-pattern* others call it, but panics are a super
-convenient way to handle *exceptional* conditions in your code.
+This package introduces error handling concepts similar to try-catch using panic and
+recover. Panics are a super convenient way to handle *exceptional* conditions in your
+code, and this package encourages broadening the scope from fatal errors to all poor
+execution conditions.
 
 Take this code for example:
 
@@ -46,7 +47,8 @@ func MyFunction() error {
 }
 ```
 
-I/O has a lot of error conditions that you can't do much about. Here is using Errorcat:
+I/O has a lot of annoying error conditions that you can't do much about. Here is using
+Errorcat:
 
 ```
 import (
@@ -63,23 +65,25 @@ func writeLine(w io.Writer, text string) {
 }
 
 func MyFunction() (rerr error) {
-	defer cat.Guard(&rerr, "myfunction failed")
+	return cat.Guard(func(_ cat.Context) error {
 
-	f, err := os.Open("file.txt")
+		f, err := os.Open("file.txt")
+		cat.Catch(err, "failed opening config file") // Annotated error reason.
 
-	// Telling the user what file operation failed
-	cat.Catch(err, "failed opening config file") 
+		writeLine(f, "Hallo welt!")
+		writeLine(f, "Goodbye!")
+		writeLine(f, "Level 3")
 
-	writeLine(f, "Hallo welt!")
-	writeLine(f, "Goodbye!")
-	writeLine(f, "Level 3")
+		return nil
 
-	return nil
+	}, "myfunction failed")
 }
 ```
 
 The code is instantly cleansed of error-passing clutter, and it's also easier to annotate
-errors.
+errors and get stack traces. Many functions don't need to return an error to the caller.
+Instead, they jump to the recovery point, so your logic can focus on actionable errors
+only.
 
 Errorcat is meant to handle errors that you don't expect to recover from. It's not meant
 for common errors that often affect execution paths. Those should still be handled the
@@ -88,16 +92,17 @@ out rare errors, "catching" them with Errorcat, and then only return and check e
 are of interest to your application.
 
 While you can have nested recovery points with Errorcat, it's more meant to have only one
-recovery point at the start of a request. This is unlike exceptions where try-catch blocks
-are nested freely. Using Errorcat for exceptional conditions comes with a number of
-benefits:
+recovery point at the start of a *request*. This is unlike traditional try-catch where
+blocks are nested freely. Go still has the normal error practice for normal conditions.
+Using Errorcat for exceptional conditions comes with a number of benefits:
 
+* Reducing error-passing noise in your codebase.
 * Centralized handling of rare errors.
 * Easy to log errors consistently. Unrecoverable errors usually require intervention, so
   it's critical that they are logged.
 * Easy annotation of errors to increase verbosity to assist debugging.
 * Stack traces of failures can also be logged easily, something that is often lost with
-  the normal Go error patterns.
+  the normal Go error patterns if you aren't careful.
 
 Errorcat eases the burden of error annotation, letting you add more details to errors when
 they are thrown and when they are recovered from. The annotation greatly assists engineers
@@ -122,15 +127,17 @@ translates errors into server responses.
 
 First you set up a recovery point, like so:
 
-	func OnRequest() (rerr error) {
-		defer cat.Recover(nil, &rerr, "request failed")
+	func OnRequest() error {
+		return cat.Guard(func(_ cat.Context) error {
 
-		handleRequest()
-
-		return nil
+			handleRequest()
+			return nil
+		
+		}, "request failed")
 	}
 
-When handling errors in your subfunctions, you use cat.Catch:
+When handling errors in your subfunctions, you use cat.Catch. I like to shorten the
+package name to `cat` for brevity.
 
 	func handleRequest() {
 		err := someLibraryFunction()
@@ -141,7 +148,7 @@ If it catches an error, it will bubble to the recovery point and annotate it wit
 messages provided, e.g., `request failed: someLibraryFunction didn't work: (error text)`.
 Simple, right? A bulk of error handling is just that, annotating the error for the user.
 
-What's more useful for HTTP servers is decorating an error with an HTTP response code. For
+What's more useful for HTTP servers is decorating an error with an HTTP status. For
 example:
 
 	func handlePostUser(user string) {
@@ -149,9 +156,9 @@ example:
 	}
 
 `BadRequest` isn't a provided function, but it's easy enough to implement yourself. In the
-recover area, you would check the error for a BadRequest and then map it accordingly. You
-can also create a higher level package that provides more flavor for your errors directly.
-For example:
+recover area, you would check the error for a BadRequest and then extract it accordingly.
+You can also create a higher level package that provides more flavor for your errors
+directly. For example:
 
 	func handlePostUser(user string) {
 		mycat.BadIf(user == "", "user cannot be empty")
@@ -159,33 +166,35 @@ For example:
 
 ### Errorcat With Context
 
-Okay, now pretend you're writing a library, where you really don't want panics to leak
-past your package code. How do you ensure that 100%? When writing library code, you don't
-have the convenience of a central recovery area. Each function that uses the error-panic
-pattern must recover on its own and have an error return.
+Okay, now pretend you're writing a library, where you cannot have panics accidentally
+leaking past your package code. How do you ensure that 100%? When writing library code,
+you don't have the convenience of a central recovery area. Each function that uses the
+error-panic pattern must recover on its own and have an error return.
 
 With an Errorcat context, you use the context object to throw errors rather than the
 global functions. That way, you *know* that you are within a guarded context when calling
 Catch (otherwise, there is no object with which to call Catch!).
 
-	func MyLibraryFunction() (rerr error) {
-		ct := errorcat.NewContext()
-		defer errorcat.Recover(ct, &rerr, "mylibraryfunction failed")
+	func MyLibraryFunction() error {
+		return errorcat.Guard(func(cat errorcat.Context) error {
 
-		someSubfunction(ct)
-		return nil
+			someSubfunction(ct)
+			return nil
+
+		}, "mylibraryfunction failed")
 	}
 
-When calling subfunctions, you will know that you need to guard the upper function if it
+When calling subfunctions, you will *know* that you need to guard the upper function if it
 requires a context to be passed in. Without context, it's not easy to tell which of your
 library functions you need to guard, and the pattern could spread needlessly.
 
 For code that already has context passing, you can merge the two contexts together, so
 long as it implements the errorcat.Context interface. A basic wrapper will do.
 
-errorcat.Context will cause panics if it detects misuse of the guard. For example, if you
-call Catch after recover was called, it will panic, indicating that you forgot to defer
-the recover or you're incorrectly reusing a context.
+errorcat.Context will cause real panics if it detects misuse of the guard. For example, if
+you call Catch after recover was called, it will panic, indicating that you forgot to
+defer the recover or you're incorrectly reusing a context. Misuse should not be possible
+if you use the `Guard` function instead of deferring a `Recover` directly.
 
 ### Crossing goroutines
 
@@ -200,10 +209,11 @@ can't do that.
 
 ### Panicking safely
 
-I recommend having a linter rule to make sure that you never forget a deferred recover. It
-is easy enough to forget to call `Recover`, just as it is easy to forget the `defer`
-keyword, both of which will silently cause hidden fatal panics later on. Using `Guard` may
-be preferrable to using `Recover` directly, as it will automatically defer the recovery.
+Using the `Guard` function is recommended over deferring a `Recover` yourself. If you do
+use `Recover` directly, I recommend having a linter rule to make sure that you never
+forget a deferred recover. It is easy enough to forget to call `Recover`, just as it is
+easy to forget the `defer` keyword, both of which will silently cause hidden fatal panics
+later on.
 
 ## Additional Details
 
