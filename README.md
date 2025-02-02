@@ -4,12 +4,21 @@
 
 *Use This One Weird Trick To Clean Up Your Go Code!*
 
-This package introduces error handling concepts similar to try-catch using panic and
-recover. Panics are a super convenient way to handle *exceptional* conditions in your
-code, and this package encourages broadening the scope from fatal errors to all poor
-execution conditions.
+This package introduces "exception" handling using panic and recover. Panics are a super
+convenient way to handle *exceptional* conditions in your code, and this package
+encourages broadening the scope from fatal errors to all *poor execution conditions*.
 
-Take this code for example:
+The idea isn't unheard of in practice. For example, re-read [Defer, Panic, and
+Recover](https://go.dev/blog/defer-panic-and-recover) from 2010. It mentions that the
+standard library (citing the [json package](https://go.dev/pkg/encoding/json/)) uses panic
+and recover internally to pass errors around before returning them.
+
+Examples:
+ * https://go.dev/src/encoding/json/encode.go
+ * https://go.dev/src/fmt/scan.go
+
+Using Errorcat employs the same pattern where you can pass certain error cases around
+easily. Take this code for example:
 
 ```
 import (
@@ -98,8 +107,8 @@ Using Errorcat for exceptional conditions comes with a number of benefits:
 
 * Reducing error-passing noise in your codebase.
 * Centralized handling of rare errors.
-* Easy to log errors consistently. Unrecoverable errors usually require intervention, so
-  it's critical that they are logged.
+* Enforces consistency with exceptional error handling. Unrecoverable errors usually
+  require intervention, so it's critical that they are logged properly.
 * Easy annotation of errors to increase verbosity to assist debugging.
 * Stack traces of failures can also be logged easily, something that is often lost with
   the normal Go error patterns if you aren't careful.
@@ -107,16 +116,16 @@ Using Errorcat for exceptional conditions comes with a number of benefits:
 Errorcat eases the burden of error annotation, letting you add more details to errors when
 they are thrown and when they are recovered from. The annotation greatly assists engineers
 in debugging production issues via log files. In addition, since stack traces are
-accessible from panic recovery, you can easily log the stack trace when handling uncommon
-errors.
+accessible from panic recovery, you have access to the full stack trace of the error
+source when handling uncommon errors.
 
 Sure, panics are more costly than passing around errors, but I'm sure you don't need a
 lesson on where "performance" lies with most real application priorities.
 
 ## Usage
 
-There are two ways to use Errorcat, with and without *context*. Context helps you to avoid
-programmer errors when you do not or can not have a global panic guard.
+There are two ways to use Errorcat, with and without *context*. Context is optional and
+helps to avoid programmer errors when you do not or can not have a global panic guard.
 
 ### Errorcat Without Context
 
@@ -127,11 +136,10 @@ translates errors into server responses.
 
 First you set up a recovery point, like so:
 
-	func OnRequest() error {
+	func OnRequest(req Request) error {
 		return cat.Guard(func(_ cat.Context) error {
 
-			handleRequest()
-			return nil
+			return handleRequest(req)
 		
 		}, "request failed")
 	}
@@ -148,7 +156,7 @@ If it catches an error, it will bubble to the recovery point and annotate it wit
 messages provided, e.g., `request failed: someLibraryFunction didn't work: (error text)`.
 Simple, right? A bulk of error handling is just that, annotating the error for the user.
 
-What's more useful for HTTP servers is decorating an error with an HTTP status. For
+What's more useful for HTTP servers is wrapping an error with an HTTP status. For
 example:
 
 	func handlePostUser(user string) {
@@ -156,20 +164,26 @@ example:
 	}
 
 `BadRequest` isn't a provided function, but it's easy enough to implement yourself. In the
-recover area, you would check the error for a BadRequest and then extract it accordingly.
-You can also create a higher level package that provides more flavor for your errors
-directly. For example:
+recover area, you would check if the error is a "bad request" type, and then extract the
+message to display to the user or API consumer. You can also create a higher level package
+that provides more flavor for your errors directly. For example:
 
 	func handlePostUser(user string) {
 		mycat.BadIf(user == "", "user cannot be empty")
 	}
 
+But be mindful that any control flow conventions you introduce will be foreign to new
+developers to your project.
+
 ### Errorcat With Context
 
-Okay, now pretend you're writing a library, where you cannot have panics accidentally
+Okay, now pretend you're writing a library, where you *cannot* have panics accidentally
 leaking past your package code. How do you ensure that 100%? When writing library code,
 you don't have the convenience of a central recovery area. Each function that uses the
-error-panic pattern must recover on its own and have an error return.
+error-panic pattern must recover on its own.
+
+If you guard every entry point properly, no context is fine, but the context pattern makes
+it programmatically impossible to miss setting up a guard.
 
 With an Errorcat context, you use the context object to throw errors rather than the
 global functions. That way, you *know* that you are within a guarded context when calling
@@ -178,7 +192,7 @@ Catch (otherwise, there is no object with which to call Catch!).
 	func MyLibraryFunction() error {
 		return errorcat.Guard(func(cat errorcat.Context) error {
 
-			someSubfunction(ct)
+			someSubfunction(cat)
 			return nil
 
 		}, "mylibraryfunction failed")
