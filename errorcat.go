@@ -121,6 +121,11 @@ func Recover(ctparam any, annotate ...any) {
 	if r := recover(); r != nil {
 		if e, ok := r.(error); ok {
 			captured = e
+
+			if e, ok := captured.(CatError); ok {
+				// Unwrap caught error.
+				captured = e.err
+			}
 		} else {
 			captured = fmt.Errorf("%v", r)
 		}
@@ -219,7 +224,7 @@ func Catch(condition any, problem ...any) {
 			switch p := problem1.(type) {
 			case error:
 				// Wrap the given error.
-				panic(CatError{fmt.Errorf("%w", p)})
+				panic(CatError{p})
 			case nil:
 				// Bad practice. A problem should be specified.
 				panic(CatError{ErrUnknown})

@@ -120,12 +120,6 @@ func TestGuardAnnotation(t *testing.T) {
 	assert.ErrorIs(t, err, errTest)
 }
 
-func assertErrorIsCat(t *testing.T, err error) {
-	if _, ok := err.(cat.CatError); !ok {
-		assert.Fail(t, "error is not a CatError")
-	}
-}
-
 // When catching errors, the `problem` describes the error state. It's useful for
 // describing what should be done with the error.
 func TestProblems(t *testing.T) {
@@ -140,7 +134,6 @@ func TestProblems(t *testing.T) {
 
 	assert.Equal(t, "service error: try again later: test-error", err.Error())
 	assert.ErrorIs(t, err, serviceError)
-	assertErrorIsCat(t, err)
 
 	// When using an error + nil combination, the error is wrapped and bubbled without
 	// further annotation.
@@ -151,7 +144,6 @@ func TestProblems(t *testing.T) {
 
 	assert.Equal(t, "test-error", err.Error())
 	assert.ErrorIs(t, err, errTest)
-	assertErrorIsCat(t, err)
 
 	// When using an error + string combination, the error is wrapped and annotated with
 	// the string.
@@ -162,7 +154,6 @@ func TestProblems(t *testing.T) {
 
 	assert.Equal(t, "problem: test-error", err.Error())
 	assert.ErrorIs(t, err, errTest)
-	assertErrorIsCat(t, err)
 
 	// When using a non-string type, it's treated the same (via fmt magic), but you
 	// shouldn't be doing that.
@@ -173,7 +164,6 @@ func TestProblems(t *testing.T) {
 
 	assert.Equal(t, "123: test-error", err.Error())
 	assert.ErrorIs(t, err, errTest)
-	assertErrorIsCat(t, err)
 
 	// When using a boolean + error combination, the problem is wrapped as the primary
 	// error.
@@ -187,7 +177,6 @@ func TestProblems(t *testing.T) {
 
 	assert.Equal(t, "test-error", err.Error())
 	assert.ErrorIs(t, err, errTest)
-	assertErrorIsCat(t, err)
 
 	// When using a boolean + nil combination, the problem is wrapped as an unknown error.
 	// This case should not be used in practice.
@@ -200,7 +189,6 @@ func TestProblems(t *testing.T) {
 	}()
 
 	assert.ErrorIs(t, err, cat.ErrUnknown)
-	assertErrorIsCat(t, err)
 
 	// When using a boolean + string combination, the problem is wrapped as a general
 	// untyped error.
@@ -211,7 +199,6 @@ func TestProblems(t *testing.T) {
 	}()
 
 	assert.Equal(t, "problemstring", err.Error())
-	assertErrorIsCat(t, err)
 
 	// When using a boolean + non-string type, the problem is wrapped as a general untyped
 	// error, but this case should not be used in practice.
@@ -222,7 +209,6 @@ func TestProblems(t *testing.T) {
 	}()
 
 	assert.Equal(t, "456", err.Error())
-	assertErrorIsCat(t, err)
 }
 
 // If a catch condition is not an error or a boolean, then Catch will wrap it into
@@ -235,7 +221,6 @@ func TestInvalidCatch(t *testing.T) {
 	}()
 
 	assert.ErrorIs(t, err, cat.ErrBadCatch)
-	assertErrorIsCat(t, err)
 }
 
 func TestGo(t *testing.T) {
@@ -246,4 +231,26 @@ func TestGo(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Equal(t, "test: whoops", err.Error())
+}
+
+func TestErrorTypeEqualsSource(t *testing.T) {
+	// [SPEC] When throwing errors without annotation, the error is returned as-is.
+	// [SPEC] Resulting errors should not be in a CatError wrapper.
+
+	// Previously we did returned the CatError wrapper, but I don't see any good use case
+	// for that side effect.
+
+	var errTest = errors.New("test-error")
+
+	err := cat.Guard(func(ct cat.Context) error {
+		cat.Catch(errTest)
+		return nil
+	})
+	assert.Equal(t, errTest, err)
+
+	err2 := cat.Guard(func(ct cat.Context) error {
+		cat.Catch(true, errTest)
+		return nil
+	})
+	assert.Equal(t, errTest, err2)
 }
